@@ -6,6 +6,7 @@
 #include <fstream>
 #include <thread>
 #include <mutex>
+#include <array>
 
 using namespace std;
 using namespace std::chrono;
@@ -47,8 +48,13 @@ public:
 
     void push_back(cmd command)
     {
-        if(m_queue.size() == 0)
-            m_file_name = "bulk" + std::to_string(command.get_create_time()) + ".log";
+        if (m_queue.size() == 0)
+        {
+            int random_variable = rand();
+
+            m_file_name = "bulk" + to_string(command.get_create_time()) + "_" + to_string(random_variable) + ".log";
+            cout << "file name " << m_file_name << endl;
+        }
 
         m_queue.push_back(command);
     }
@@ -74,17 +80,18 @@ class cmd_processor
     deque<cmd_block*> m_log_queue;
     mutex m_log_queue_lock;
 
-    deque<cmd_block*> m_file_queue;
+    //tuple<file_name, cmd, is_last_cmd>
+    deque< tuple<string, string, bool> > m_file_queue;
     mutex m_file_queue_lock;
 
     condition_variable m_log_queue_check;
     condition_variable m_file_queue_check;
-    bool m_done = false;
+    bool m_log_done = false;
+    bool m_file_done = false;
 
     thread m_log_th;
-    //list<thread> m_file_th_list;????
-    thread m_file_th1;
-    thread m_file_th2;
+    vector<thread> m_file_th_vec;
+    size_t m_f_th_count = 0;
 
     size_t dynamic_mode = 0;
     size_t m_N = 0;
@@ -143,8 +150,13 @@ class cmd_processor
 
                 while (!m_log_queue.size())
                 {
-                    if (m_done)
+                    if (m_log_done)
+                    {
+                        //End file threads
+                        m_file_done = true;
+                        m_file_queue_check.notify_all();
                         return;
+                    }
 
                     m_log_queue_check.wait(lock);
                 }
@@ -160,6 +172,11 @@ class cmd_processor
             //Create bulk line for output
             string bulk_str = "bulk: ";
 
+            //Create file here
+            ofstream fout(tmp_pcmd_block->m_file_name, ofstream::app);
+            fout << bulk_str;
+            fout.close();
+
             bool begin = true;
 
             while (!tmp_pcmd_block->empty())
@@ -172,7 +189,21 @@ class cmd_processor
                     begin = false;
 
                 //execute cmd from block
-                bulk_str += next.execute();
+                string file_cmd_record;
+                file_cmd_record = next.execute();
+                bulk_str += file_cmd_record;
+
+                {
+                    unique_lock<mutex> lock(m_file_queue_lock);
+
+                    bool is_last_cmd = false;
+                    if (!tmp_pcmd_block->size())
+                        is_last_cmd = true;
+
+                    m_file_queue.push_back(make_tuple(tmp_pcmd_block->m_file_name, file_cmd_record, is_last_cmd));
+                }
+
+                m_file_queue_check.notify_all();
             }
 
             if(tmp_pcmd_block)
@@ -185,12 +216,39 @@ class cmd_processor
 
     void file_th_f()
     {
-        //while (true)
-       // {
+        while (true)
+        {
+            tuple<string, string, bool> tmp_record;
+            {
+                unique_lock<mutex> lock(m_file_queue_lock);
 
-       // }
+                while (!m_file_queue.size())
+                {
+                    if (m_file_done)
+                        return;
+
+                    m_file_queue_check.wait(lock);
+                }
+
+                tmp_record = m_file_queue.front();
+                m_file_queue.pop_front();
+
+                string file_name;
+                string file_cmd_record;
+                bool is_last_cmd;
+
+                tie(file_name, file_cmd_record, is_last_cmd) = tmp_record;
+
+                //Create log file
+                ofstream fout(file_name, ofstream::app);
+                if (is_last_cmd)
+                    fout << file_cmd_record;
+                else
+                    fout << file_cmd_record << ", ";
+                fout.close();
+            }
+        }
     }
-
 
     void bulk()
     {
@@ -227,26 +285,33 @@ class cmd_processor
     }
 
 public:
-    cmd_processor(size_t N, bool async = false) : m_N(N), m_async(async) 
+    cmd_processor(size_t N, size_t f_th_count = 2) : m_N(N), m_f_th_count(f_th_count)
     {
         m_cur_cmd_block = new cmd_block();
 
-        if (m_async)
+        if (f_th_count)
         {
+            m_async = true;
+
+            //use current time as seed for random generator
+            srand(time(nullptr)); 
+
             m_log_th = thread(&cmd_processor::log_th_f, this);
-            m_file_th1 = thread(&cmd_processor::file_th_f, this);
-            m_file_th2 = thread(&cmd_processor::file_th_f, this);
+
+            for (size_t i = 0; i < f_th_count; i++)
+                m_file_th_vec.push_back(thread(&cmd_processor::file_th_f, this));
         }
     }
     
     ~cmd_processor()
     {
-        m_done = true;
+        m_log_done = true;
 
         bulk();
         m_log_th.join();
-        m_file_th1.join();
-        m_file_th2.join();
+
+        for (auto& t : m_file_th_vec)
+            t.join();
 
         delete m_cur_cmd_block;
     }

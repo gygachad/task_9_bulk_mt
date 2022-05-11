@@ -6,7 +6,7 @@ namespace async
 
 handle_t connect(std::size_t bulk) 
 {
-    cmd_processor* cmd_proc = new cmd_processor(bulk, true);
+    cmd_processor* cmd_proc = new cmd_processor(bulk);
 
     return static_cast<handle_t>(cmd_proc);
 }

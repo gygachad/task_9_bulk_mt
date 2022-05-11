@@ -11,33 +11,28 @@ using namespace std;
 
 void recv_th(async::handle_t h)
 {
-    while (1)
+    size_t counter = 20;
+
+    while (counter--)
     {
         //getline(cin, cmd);
         //async::receive(h, cmd.c_str(), cmd.length());
         async::receive(h, "1\n2\n3\n4\n5\n", sizeof("1\n2\n3\n4\n5\n"));
-        //_sleep(4);
+        _sleep(4);
     }
 }
 
 int main(int argc, char* argv[])
 {
+    /*
     auto h = async::connect(5);
-
-    string cmd;
     
-    //thread th = thread(recv_th, h);
-    size_t counter = 7;
-
-    while (counter--)
-    {
-        getline(cin, cmd);
-        async::receive(h, cmd.c_str(), cmd.length());
-    }
+    thread th = thread(recv_th, h);
+    th.join();
 
     async::disconnect(h);
-
-    /*
+    */
+   
     std::size_t bulk = 5;
     auto h = async::connect(bulk);
     auto h2 = async::connect(bulk);
@@ -47,7 +42,6 @@ int main(int argc, char* argv[])
     async::receive(h, "b\nc\nd\n}\n89\n", 11);
     async::disconnect(h);
     async::disconnect(h2);
-    */
-
+    
     return 0;
 }
