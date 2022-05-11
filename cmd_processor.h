@@ -51,9 +51,7 @@ public:
         if (m_queue.size() == 0)
         {
             int random_variable = rand();
-
             m_file_name = "bulk" + to_string(command.get_create_time()) + "_" + to_string(random_variable) + ".log";
-            cout << "file name " << m_file_name << endl;
         }
 
         m_queue.push_back(command);
@@ -294,7 +292,7 @@ public:
             m_async = true;
 
             //use current time as seed for random generator
-            srand(time(nullptr)); 
+            srand(static_cast<int>(time(nullptr))); 
 
             m_log_th = thread(&cmd_processor::log_th_f, this);
 
