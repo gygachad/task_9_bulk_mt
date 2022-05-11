@@ -18,11 +18,10 @@ void recv_th(async::handle_t h)
         //getline(cin, cmd);
         //async::receive(h, cmd.c_str(), cmd.length());
         async::receive(h, "1\n2\n3\n4\n5\n", sizeof("1\n2\n3\n4\n5\n"));
-        _sleep(4);
     }
 }
 
-int main(int argc, char* argv[])
+int main()
 {
     /*
     auto h = async::connect(5);

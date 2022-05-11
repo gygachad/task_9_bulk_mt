@@ -32,6 +32,7 @@ else ()
     target_compile_options(async_cli PRIVATE
         -Wall -Wextra -pedantic -Werror
     )
+    target_link_libraries(async pthread)
 endif()
 
 install(TARGETS async_cli RUNTIME DESTINATION bin)

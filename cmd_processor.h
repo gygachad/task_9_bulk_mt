@@ -7,6 +7,7 @@
 #include <thread>
 #include <mutex>
 #include <array>
+#include <condition_variable>
 
 using namespace std;
 using namespace std::chrono;
